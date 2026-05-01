@@ -1,0 +1,60 @@
+#cloud-config
+autoinstall:
+  version: 1
+
+  identity:
+    hostname: linux_test1
+    username: demo
+    # testing the password is "Pensando0$"
+    password: "$6$At2NFDpu8KeuVJJ.$79cJbCQIH8JFFYaqqKinUnzolzHt6YnEI1gZmobU0KEnVws1NaohVTxiZJ8ft5zdyPZ/xldEJHqrB/fI9vB4P/"
+
+  locale: en_GB
+  keyboard:
+    layout: gb
+
+  network:
+    version: 2
+    ethernets:
+      ens160:
+        dhcp4: no
+        addresses:
+          - 192.168.102.222/24
+        gateway4: 192.168.102.1
+        nameservers:
+          addresses: [192.168.102.1, 1.1.1.1]
+
+  ssh:
+    install-server: true
+    allow-pw: true
+
+  # Install packages during install
+  packages:
+    - curl
+    - net-tools
+    
+  storage:
+    layout:
+      name: direct
+
+  # Ensure system is fully up to date
+  updates: all
+      
+  user-data:
+    package_update: true     # runs apt update
+    package_upgrade: true    # runs apt upgrade
+    users:
+      - name: demo
+        ssh_authorized_keys:
+          - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AVAAIGKtaraHpCtlWRF8yTZYj3/Dqdt+ATJgutkz8zVcoPEM tdmakepeace@gmail.com
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        shell: /bin/bash
+
+    # optional: install extra packages post-install
+    packages:
+      - tree
+      - jq
+
+    #clean up un-needed packages
+    runcmd:
+      - apt-get autoremove -y
+      

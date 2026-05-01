@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cloud-init autoinstall builder</title>
+  <style>
+    :root {
+      --accent: #ed1c24;
+      --accent-dim: rgba(237, 28, 36, 0.18);
+      --bg: #0a0a0a;
+      --bg2: #121212;
+      --panel: #161616;
+      --border: #2e2e2e;
+      --text: #f5f5f5;
+      --muted: #a8a8a8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(165deg, #0f0f0f 0%, var(--bg) 50%, #0c0c0c 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .topbar {
+      height: 4px;
+      background: linear-gradient(90deg, var(--accent), #ff4d54, var(--accent));
+    }
+    header {
+      padding: 20px 28px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 650;
+    }
+    /* Single column: form then output. Avoids a narrow/zero-width second grid track in some browsers
+       and keeps Save/Copy in normal document flow (no nested scroll hiding the toolbar). */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 22px;
+      padding: 22px 28px 40px;
+      align-items: start;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+    }
+    section.block {
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    section.block:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    .sec-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .sec-head label {
+      font-weight: 650;
+      font-size: 14px;
+      margin: 0;
+      cursor: pointer;
+    }
+    .sec-head input { width: 18px; height: 18px; accent-color: var(--accent); }
+    label.field-label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 8px 0 4px;
+    }
+    input[type=text], input[type=password], textarea, select {
+      width: 100%;
+      padding: 9px 11px;
+      background: #1e1e1e;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    textarea { min-height: 72px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .pw-mode {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px 20px;
+      margin: 10px 0 6px;
+      align-items: center;
+    }
+    .pw-mode label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      margin: 0;
+    }
+    .pw-mode input[type=radio] { width: 16px; height: 16px; accent-color: var(--accent); }
+    .subfields.disabled {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    button.primary {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #ff2b33, var(--accent));
+      color: #fff;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    button.primary:hover { filter: brightness(1.05); }
+    button.primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      filter: grayscale(0.35);
+    }
+    button.primary:disabled:hover { filter: grayscale(0.35); }
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    button.secondary, a.secondary-link {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #2e2e2e, #232323);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+    }
+    button.secondary:hover { filter: brightness(1.06); }
+    .success {
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.45);
+      color: #86efac;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    .error {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fecaca;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    /* Output panel: simple blocks + readonly textareas (always visible; copy uses .value). */
+    #output-panel .op-lead {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    #output-panel .op-card {
+      margin-bottom: 20px;
+      padding: 14px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+    }
+    #output-panel .op-card:last-child {
+      margin-bottom: 0;
+    }
+    #output-panel .op-card h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 650;
+      color: #f0f0f0;
+    }
+    #output-panel .op-row {
+      margin-bottom: 12px;
+      line-height: 0;
+    }
+    #output-panel .op-row a.op-fetch,
+    #output-panel .op-row button.op-clip {
+      display: inline-block;
+      vertical-align: middle;
+      margin: 0 12px 8px 0;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 650;
+      border-radius: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      border: 2px solid var(--accent);
+      background: #3d1a1f;
+      color: #fff;
+      line-height: normal;
+    }
+    #output-panel .op-row a.op-fetch:hover,
+    #output-panel .op-row button.op-clip:hover {
+      background: #5c252c;
+    }
+    #output-panel textarea.op-view {
+      display: block;
+      width: 100%;
+      min-height: 240px;
+      margin: 0;
+      padding: 12px;
+      font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #e6edf3;
+      background: #010409;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      resize: vertical;
+      white-space: pre;
+      overflow-x: auto;
+      box-sizing: border-box;
+    }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    h4.net-sub {
+      margin: 12px 0 8px;
+      font-size: 13px;
+      font-weight: 650;
+      color: var(--text);
+    }
+    .late-user-row {
+      margin-bottom: 14px;
+      padding: 12px;
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .late-user-row h5 {
+      margin: 0 0 10px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    footer {
+      padding: 8px 28px 28px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar" aria-hidden="true"></div>
+  <header>
+    <h1>Cloud-init autoinstall builder</h1>
+  </header>
+
+  <div class="layout">
+    <form class="panel" method="post" id="main-form">
+      <h2>Sections</h2>
+      {% if prefs_saved %}<div class="success">Preferences saved. They will load automatically next time you open this app.</div>{% endif %}
+      {% if prefs_cleared %}<div class="success">Saved preferences were cleared. Defaults will come from the seed directory again.</div>{% endif %}
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+      <section class="block" data-section="identity">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_identity" id="enable_identity"
+            {% if defaults.enable_identity %}checked{% endif %} />
+          <label for="enable_identity">Identity (subiquity)</label>
+        </div>
+        <div class="subfields" data-sub="identity">
+          <label class="field-label" for="hostname">Hostname</label>
+          <input id="hostname" name="hostname" type="text" value="{{ defaults.hostname }}" />
+          <div class="row2">
+            <div>
+              <label class="field-label" for="username">Username</label>
+              <input id="username" name="username" type="text" value="{{ defaults.username }}" />
+            </div>
+          </div>
+          <div class="pw-mode" role="radiogroup" aria-label="Password format">
+            <label>
+              <input type="radio" name="password_mode" value="hashed" id="password_mode_hashed"
+                {% if defaults.password_mode != 'plain' %}checked{% endif %} />
+              Pre-hashed (paste <code>$6$…</code>)
+            </label>
+            <label>
+              <input type="radio" name="password_mode" value="plain" id="password_mode_plain"
+                {% if defaults.password_mode == 'plain' %}checked{% endif %} />
+              Plain text (hash with SHA-512 crypt here)
+            </label>
+          </div>
+          <div id="pw-hashed-block">
+            <label class="field-label" for="password_hash">Password hash</label>
+            <input id="password_hash" name="password_hash" type="text" value="{{ defaults.password_hash }}" autocomplete="off" />
+            <p class="hint">Same format as <code>mkpasswd --method=SHA-512</code> / libcrypt <code>$6$</code>.</p>
+          </div>
+          <div id="pw-plain-block">
+            <label class="field-label" for="password_plain">Plain password</label>
+            <input id="password_plain" name="password_plain" type="text" value="" autocomplete="off" spellcheck="false" />
+            <p class="hint">Not stored after submit; output YAML only contains the hash. Only this <em>or</em> the hash field is used.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" data-section="locale">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_locale" id="enable_locale"
+            {% if defaults.enable_locale %}checked{% endif %} />
+          <label for="enable_locale">Locale &amp; keyboard</label>
+        </div>
+        <div class="subfields" data-sub="locale">
+          <div class="row2">
+            <div>
+              <label class="field-label" for="locale">Locale</label>
+              <select id="locale" name="locale">
+                {% for val, label in locale_choices %}
+                <option value="{{ val }}" {% if defaults.locale == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="field-label" for="keyboard_layout">Keyboard layout (XKB)</label>
+              <select id="keyboard_layout" name="keyboard_layout">
+                {% for val, label in keyboard_choices %}
+                <option value="{{ val }}" {% if defaults.keyboard_layout == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" data-section="network">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_network" id="enable_network"
+            {% if defaults.enable_network %}checked{% endif %} />
+          <label for="enable_network">Network (netplan v2)</label>
+        </div>
+        <div class="subfields" data-sub="network">
+          <h4 class="net-sub">Network 1</h4>
+          <label class="field-label" for="iface">Ethernet interface</label>
+          <select id="iface" name="iface">
+            {% for val, label in iface_choices %}
+            <option value="{{ val }}" {% if defaults.iface == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <label class="field-label" for="network_mode">Mode</label>
+          <select id="network_mode" name="network_mode">
+            <option value="dhcp" {% if defaults.network_mode == 'dhcp' %}selected{% endif %}>DHCP</option>
+            <option value="static" {% if defaults.network_mode == 'static' %}selected{% endif %}>Static</option>
+          </select>
+          <div id="net1-static">
+            <label class="field-label" for="address_cidr">Address / CIDR</label>
+            <input id="address_cidr" name="address_cidr" type="text" value="{{ defaults.address_cidr }}" />
+            <div class="row2">
+              <div>
+                <label class="field-label" for="gateway">Gateway (gateway4)</label>
+                <input id="gateway" name="gateway" type="text" value="{{ defaults.gateway }}" />
+              </div>
+              <div>
+                <label class="field-label" for="nameservers">Nameservers</label>
+                <input id="nameservers" name="nameservers" type="text" value="{{ defaults.nameservers }}" />
+              </div>
+            </div>
+          </div>
+
+          <label class="field-label" style="margin-top:14px;">
+            <input type="checkbox" name="enable_network2" id="enable_network2"
+              {% if defaults.enable_network2 %}checked{% endif %} />
+            Enable network 2 (second interface)
+          </label>
+          <div id="net2-panel" class="subfields {% if not defaults.enable_network2 %}disabled{% endif %}" style="margin-top:10px;">
+            <h4 class="net-sub">Network 2</h4>
+            <label class="field-label" for="iface2">Ethernet interface</label>
+            <select id="iface2" name="iface2">
+              {% for val, label in iface2_choices %}
+              <option value="{{ val }}" {% if defaults.iface2 == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <label class="field-label" for="network_mode2">Mode</label>
+            <select id="network_mode2" name="network_mode2">
+              <option value="dhcp" {% if defaults.network_mode2 == 'dhcp' %}selected{% endif %}>DHCP</option>
+              <option value="static" {% if defaults.network_mode2 == 'static' %}selected{% endif %}>Static</option>
+            </select>
+            <div id="net2-static">
+              <label class="field-label" for="address_cidr2">Address / CIDR</label>
+              <input id="address_cidr2" name="address_cidr2" type="text" value="{{ defaults.address_cidr2 }}" />
+              <div class="row2">
+                <div>
+                  <label class="field-label" for="gateway2">Gateway (gateway4)</label>
+                  <input id="gateway2" name="gateway2" type="text" value="{{ defaults.gateway2 }}" />
+                </div>
+                <div>
+                  <label class="field-label" for="nameservers2">Nameservers</label>
+                  <input id="nameservers2" name="nameservers2" type="text" value="{{ defaults.nameservers2 }}" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" data-section="ssh">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_ssh" id="enable_ssh"
+            {% if defaults.enable_ssh %}checked{% endif %} />
+          <label for="enable_ssh">SSH (installer)</label>
+        </div>
+        <div class="subfields" data-sub="ssh">
+          <label class="field-label"><input type="checkbox" name="ssh_install_server" {% if defaults.ssh_install_server %}checked{% endif %} /> Install OpenSSH server</label>
+          <label class="field-label"><input type="checkbox" name="ssh_allow_pw" {% if defaults.ssh_allow_pw %}checked{% endif %} /> Allow password authentication</label>
+        </div>
+      </section>
+
+      <section class="block" data-section="packages_early">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_packages_early" id="enable_packages_early"
+            {% if defaults.enable_packages_early %}checked{% endif %} />
+          <label for="enable_packages_early">Packages (during install)</label>
+        </div>
+        <div class="subfields" data-sub="packages_early">
+          <label class="field-label" for="packages_early_text">One package per line</label>
+          <textarea id="packages_early_text" name="packages_early_text">{{ defaults.packages_early_text }}</textarea>
+        </div>
+      </section>
+
+      <section class="block" data-section="storage">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_storage" id="enable_storage"
+            {% if defaults.enable_storage %}checked{% endif %} />
+          <label for="enable_storage">Storage layout</label>
+        </div>
+        <div class="subfields" data-sub="storage">
+          <label class="field-label" for="storage_layout">Layout name</label>
+          <select id="storage_layout" name="storage_layout">
+            <option value="direct" {% if defaults.storage_layout == 'direct' %}selected{% endif %}>direct</option>
+            <option value="lvm" {% if defaults.storage_layout == 'lvm' %}selected{% endif %}>lvm</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="block" data-section="updates">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_updates" id="enable_updates"
+            {% if defaults.enable_updates %}checked{% endif %} />
+          <label for="enable_updates">Updates during install</label>
+        </div>
+        <div class="subfields" data-sub="updates">
+          <label class="field-label" for="updates_policy">Policy</label>
+          <select id="updates_policy" name="updates_policy">
+            <option value="all" {% if defaults.updates_policy == 'all' %}selected{% endif %}>all</option>
+            <option value="security" {% if defaults.updates_policy == 'security' %}selected{% endif %}>security</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="block" data-section="late">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_late_user_data" id="enable_late_user_data"
+            {% if defaults.enable_late_user_data %}checked{% endif %} />
+          <label for="enable_late_user_data">Late cloud-init (<code>autoinstall.user-data</code>)</label>
+        </div>
+        <div class="subfields" data-sub="late">
+          <label class="field-label"><input type="checkbox" name="late_package_update" {% if defaults.late_package_update %}checked{% endif %} /> package_update</label>
+          <label class="field-label"><input type="checkbox" name="late_package_upgrade" {% if defaults.late_package_upgrade %}checked{% endif %} /> package_upgrade</label>
+          <p class="hint" style="margin-top:10px;">Users below are written to <code>autoinstall.user-data.users</code> with SSH keys (one public key per line). Rows with empty name and no keys are skipped.</p>
+          {% for i in late_user_slots %}
+          <div class="late-user-row">
+            <h5>User {{ i + 1 }}</h5>
+            <label class="field-label" for="late_u_name_{{ i }}">Login name</label>
+            <input id="late_u_name_{{ i }}" name="late_u_name_{{ i }}" type="text" value="{% if i < late_users_rows|length %}{{ late_users_rows[i].name }}{% endif %}" />
+            <label class="field-label" for="late_u_keys_{{ i }}">SSH public keys (one per line)</label>
+            <textarea id="late_u_keys_{{ i }}" name="late_u_keys_{{ i }}" rows="3">{% if i < late_users_rows|length %}{{ late_users_rows[i].keys_text }}{% endif %}</textarea>
+            <div class="row2">
+              <div>
+                <label class="field-label" for="late_u_shell_{{ i }}">Shell</label>
+                <input id="late_u_shell_{{ i }}" name="late_u_shell_{{ i }}" type="text" value="{% if i < late_users_rows|length %}{{ late_users_rows[i].shell }}{% else %}/bin/bash{% endif %}" />
+              </div>
+              <div>
+                <label class="field-label">&nbsp;</label>
+                <label class="field-label"><input type="checkbox" name="late_u_sudo_{{ i }}" {% if i < late_users_rows|length and late_users_rows[i].sudo_nopasswd %}checked{% endif %} /> sudo NOPASSWD</label>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+          <label class="field-label" for="packages_late_text">Extra packages (first boot)</label>
+          <textarea id="packages_late_text" name="packages_late_text">{{ defaults.packages_late_text }}</textarea>
+          <label class="field-label"><input type="checkbox" name="late_runcmd_autoremove" {% if defaults.late_runcmd_autoremove %}checked{% endif %} /> runcmd: apt-get autoremove -y</label>
+        </div>
+      </section>
+
+      <p class="hint" id="generate-gate-hint" style="display: none;">
+        <strong>Identity</strong> is enabled: enter a <strong>password hash</strong> or <strong>plain password</strong> before generating.
+      </p>
+      <button type="submit" name="action" value="generate" class="primary" id="btn-generate">Generate user-data &amp; meta-data</button>
+      <div class="btn-row">
+        <button type="submit" name="action" value="save_prefs" class="secondary" formnovalidate>Save preferences</button>
+        <button type="submit" name="action" value="clear_prefs" class="secondary" formnovalidate
+          onclick="return confirm('Clear saved preferences and use seed defaults next time?');">Clear saved preferences</button>
+      </div>
+      <p class="hint">Plain passwords are never saved. With <strong>Identity</strong> on, a password is required to enable <strong>Generate</strong>. Then scroll to <strong>Output</strong> for copy/download.</p>
+    </form>
+
+    <section id="output-panel" class="panel">
+      <h2>Output</h2>
+      {% if user_data_out is not none %}
+        {% if output_from_disk %}
+        <p class="op-lead">Loaded from <code>output/</code>. Use <strong>Generate</strong> to rebuild from the form.</p>
+        {% endif %}
+
+        <div class="op-card">
+          <h3>user-data</h3>
+          <div class="op-row">
+            <a class="op-fetch" href="{{ url_for('serve_output_artifact', name='user-data') }}" download>Download file</a>
+            <button type="button" class="op-clip" data-op-copy="op-ta-user-data">Copy to clipboard</button>
+          </div>
+          <textarea id="op-ta-user-data" class="op-view" readonly rows="20" wrap="off" spellcheck="false">{{ user_data_out | e }}</textarea>
+        </div>
+
+        <div class="op-card">
+          <h3>meta-data</h3>
+          <div class="op-row">
+            <a class="op-fetch" href="{{ url_for('serve_output_artifact', name='meta-data') }}" download>Download file</a>
+            <button type="button" class="op-clip" data-op-copy="op-ta-meta-data">Copy to clipboard</button>
+          </div>
+          <textarea id="op-ta-meta-data" class="op-view" readonly rows="8" wrap="off" spellcheck="false">{{ meta_data_out | e }}</textarea>
+        </div>
+      {% else %}
+        <p class="op-lead">
+          Submit <strong>Generate user-data &amp; meta-data</strong> to show both files here (read-only boxes with <strong>Copy to clipboard</strong>).
+          If <code>output/user-data</code> and <code>output/meta-data</code> already exist, reload the page.
+        </p>
+      {% endif %}
+    </section>
+  </div>
+
+  <footer>
+    Browser: set <code>CLOUDINIT_BROWSER_ONLY=1</code> and open this app’s port (see console).
+    Desktop: install <code>pywebview</code> and run <code>python app.py</code> (embedded window).
+    Seed path override: <code>CLOUDINIT_SEED_DIR</code>.     Outputs: <code>output/user-data</code>, <code>output/meta-data</code>. Backup: <code>backup/preferences.json</code> (removed when you clear preferences).
+  </footer>
+
+  <script>
+    (function () {
+      var pairs = [
+        ["enable_identity", "identity"],
+        ["enable_locale", "locale"],
+        ["enable_network", "network"],
+        ["enable_ssh", "ssh"],
+        ["enable_packages_early", "packages_early"],
+        ["enable_storage", "storage"],
+        ["enable_updates", "updates"],
+        ["enable_late_user_data", "late"]
+      ];
+      function syncGenerateGate() {
+        var btn = document.getElementById("btn-generate");
+        var hint = document.getElementById("generate-gate-hint");
+        if (!btn) return;
+        var idCb = document.getElementById("enable_identity");
+        var needPw = idCb && idCb.checked;
+        var ok = true;
+        if (needPw) {
+          var plainMode = document.getElementById("password_mode_plain");
+          var usePlain = plainMode && plainMode.checked;
+          if (usePlain) {
+            var pp = document.getElementById("password_plain");
+            ok = !!(pp && pp.value.trim().length > 0);
+          } else {
+            var ph = document.getElementById("password_hash");
+            ok = !!(ph && ph.value.trim().length > 0);
+          }
+        }
+        btn.disabled = !ok;
+        if (hint) {
+          hint.style.display = ok ? "none" : "block";
+        }
+      }
+
+      function sync() {
+        pairs.forEach(function (p) {
+          var cb = document.getElementById(p[0]);
+          var sub = document.querySelector('[data-sub="' + p[1] + '"]');
+          if (!cb || !sub) return;
+          sub.classList.toggle("disabled", !cb.checked);
+        });
+        syncGenerateGate();
+      }
+      pairs.forEach(function (p) {
+        var cb = document.getElementById(p[0]);
+        if (cb) cb.addEventListener("change", sync);
+      });
+      sync();
+
+      function syncNetStatic() {
+        var m1 = document.getElementById("network_mode");
+        var s1 = document.getElementById("net1-static");
+        if (m1 && s1) s1.style.display = m1.value === "static" ? "block" : "none";
+        var m2 = document.getElementById("network_mode2");
+        var s2 = document.getElementById("net2-static");
+        if (m2 && s2) s2.style.display = m2.value === "static" ? "block" : "none";
+      }
+      var nm1 = document.getElementById("network_mode");
+      var nm2 = document.getElementById("network_mode2");
+      if (nm1) nm1.addEventListener("change", syncNetStatic);
+      if (nm2) nm2.addEventListener("change", syncNetStatic);
+      syncNetStatic();
+
+      function syncNet2Panel() {
+        var cb = document.getElementById("enable_network2");
+        var panel = document.getElementById("net2-panel");
+        if (!cb || !panel) return;
+        panel.classList.toggle("disabled", !cb.checked);
+      }
+      var en2 = document.getElementById("enable_network2");
+      if (en2) en2.addEventListener("change", syncNet2Panel);
+      syncNet2Panel();
+
+      function syncPasswordMode() {
+        var plain = document.getElementById("password_mode_plain");
+        var pb = document.getElementById("pw-plain-block");
+        var hb = document.getElementById("pw-hashed-block");
+        if (!plain || !pb || !hb) return;
+        var usePlain = plain.checked;
+        pb.style.display = usePlain ? "block" : "none";
+        hb.style.display = usePlain ? "none" : "block";
+        syncGenerateGate();
+      }
+      var pmh = document.getElementById("password_mode_hashed");
+      var pmp = document.getElementById("password_mode_plain");
+      if (pmh) pmh.addEventListener("change", syncPasswordMode);
+      if (pmp) pmp.addEventListener("change", syncPasswordMode);
+      syncPasswordMode();
+
+      ["password_hash", "password_plain"].forEach(function (fid) {
+        var el = document.getElementById(fid);
+        if (el) {
+          el.addEventListener("input", syncGenerateGate);
+          el.addEventListener("change", syncGenerateGate);
+        }
+      });
+
+      function flashButton(btn, doneLabel) {
+        if (!btn || btn.tagName !== "BUTTON") return;
+        var orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = doneLabel;
+        setTimeout(function () {
+          btn.textContent = orig;
+          btn.disabled = false;
+        }, 1400);
+      }
+
+      function copyFromTextarea(fieldId, btn) {
+        var el = document.getElementById(fieldId);
+        if (!el || el.tagName !== "TEXTAREA") return;
+        var text = el.value;
+        function ok() {
+          flashButton(btn, "Copied");
+        }
+        function fail() {
+          flashButton(btn, "Failed");
+        }
+        function trySelectExec() {
+          try {
+            el.focus();
+            el.select();
+            el.setSelectionRange(0, text.length);
+            return document.execCommand("copy");
+          } catch (e) {
+            return false;
+          }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(ok).catch(function () {
+            if (trySelectExec()) ok();
+            else fail();
+          });
+          return;
+        }
+        if (trySelectExec()) ok();
+        else fail();
+      }
+
+      var opPanel = document.getElementById("output-panel");
+      if (opPanel) {
+        opPanel.addEventListener("click", function (ev) {
+          var t = ev.target;
+          if (!t || !t.closest) return;
+          var btn = t.closest("button[data-op-copy]");
+          if (!btn || !opPanel.contains(btn)) return;
+          var fid = btn.getAttribute("data-op-copy");
+          if (fid) copyFromTextarea(fid, btn);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

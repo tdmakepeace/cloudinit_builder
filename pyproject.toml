@@ -1,0 +1,29 @@
+[project]
+name = "cloudinit-builder"
+version = "0.1.0"
+description = "Flask UI to compose cloud-init / autoinstall user-data and meta-data"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0.0",
+    "passlib>=1.7.4",
+    "pyyaml>=6.0.1",
+    "pywebview>=5.0",
+]
+
+[project.optional-dependencies]
+desktop = ["pywebview>=5.0"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["cloudinit_builder*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["UP045"]
