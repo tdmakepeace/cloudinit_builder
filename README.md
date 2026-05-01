@@ -2,6 +2,16 @@
 
 Web UI to build Ubuntu subiquity/autoinstall `#cloud-config` **user-data** and NoCloud **meta-data** from form fields.
 
+## Screenshots
+
+**Configuration** — identity (hostname, user, password), locale & keyboard, netplan network, SSH, packages, and related sections.
+
+![Cloud-init autoinstall builder — form](docs/images/readme-form.png)
+
+**Output** — generated `user-data` and `meta-data` with **Download file** and **Copy to clipboard** (and optional load from `output/` on refresh).
+
+![Cloud-init autoinstall builder — output](docs/images/readme-output.png)
+
 ## Paths and behavior
 
 **`initial/`** (`~\Cloudinit_builder\initial`) supplies the default **user-data** / **meta-data** templates.
