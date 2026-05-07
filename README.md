@@ -57,16 +57,18 @@ mkdir -p output
 docker run --rm -p 10000:10000 -v "$(pwd)/output:/app/output" cloudinit_builder
 ```
 
-On Windows PowerShell, use:
+Stop the app:
 
-```powershell
-New-Item -ItemType Directory -Force -Path .\output | Out-Null
-docker run --rm -p 10000:10000 -v "${PWD}\output:/app/output" cloudinit_builder
-```
+- Press `Ctrl+C` in the terminal running the container.
+
+Optional:
+
+- Run detached: `docker run -d -p 10000:10000 -v "$(pwd)/output:/app/output" --name cloudinit_builder cloudinit_builder`
+- Stop detached container: `docker stop cloudinit_builder`
 
 Then open `http://127.0.0.1:10000`.
 
 Once you have downloaded the files to a seed folder. 
 ```bash
- genisoimage -output seed.iso -volid cidata -joliet -r seed/
+ genisoimage -output example.iso -volid cidata -joliet -r output/
 ```
