@@ -42,6 +42,30 @@ python app.py
 
 Port and options are configured in `app.py` under `if __name__ == "__main__"`.
 
+## Docker
+
+Build the image from the project root:
+
+```bash
+docker build -t cloudinit_builder .
+```
+
+Run the container and map the app output to a local `output/` folder under your current directory:
+
+```bash
+mkdir -p output
+docker run --rm -p 10000:10000 -v "$(pwd)/output:/app/output" cloudinit_builder
+```
+
+On Windows PowerShell, use:
+
+```powershell
+New-Item -ItemType Directory -Force -Path .\output | Out-Null
+docker run --rm -p 10000:10000 -v "${PWD}\output:/app/output" cloudinit_builder
+```
+
+Then open `http://127.0.0.1:10000`.
+
 Once you have downloaded the files to a seed folder. 
 ```bash
  genisoimage -output seed.iso -volid cidata -joliet -r seed/
