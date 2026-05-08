@@ -10,6 +10,9 @@ def late_users_from_form(form: Mapping[str, Any], max_rows: int = 32) -> list[di
     """Build late user dicts from indexed form fields (``late_u_name_0``, etc.)."""
     out: list[dict[str, Any]] = []
     for i in range(max_rows):
+        enabled = form.get(f"late_u_enabled_{i}") == "on"
+        if not enabled:
+            continue
         name = (form.get(f"late_u_name_{i}") or "").strip()
         keys_text = form.get(f"late_u_keys_{i}") or ""
         keys = [k.strip() for k in str(keys_text).splitlines() if k.strip()]
@@ -38,6 +41,7 @@ def late_users_for_template(users: list[dict[str, Any]]) -> list[dict[str, Any]]
         keys_text = "\n".join(str(k) for k in keys)
         rows.append(
             {
+                "enabled": True,
                 "name": u.get("name", ""),
                 "keys_text": keys_text,
                 "shell": u.get("shell", "/bin/bash"),
@@ -47,6 +51,7 @@ def late_users_for_template(users: list[dict[str, Any]]) -> list[dict[str, Any]]
     if not rows:
         rows.append(
             {
+                "enabled": False,
                 "name": "",
                 "keys_text": "",
                 "shell": "/bin/bash",
