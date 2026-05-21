@@ -589,6 +589,17 @@
           </div>
           <textarea id="op-ta-meta-data" class="op-view" readonly rows="8" wrap="off" spellcheck="false">{{ meta_data_out | e }}</textarea>
         </div>
+
+        <div class="op-card">
+          <h3>NoCloud ISO</h3>
+          <div class="op-row">
+            {% if geniso_available %}
+            <a class="op-fetch" href="{{ url_for('serve_output_artifact', name='cidata.iso') }}" download>Download NoCloud ISO (cidata)</a>
+            {% else %}
+            <span class="hint">ISO build requires <code>genisoimage</code> on the server (included in the Docker image).</span>
+            {% endif %}
+          </div>
+        </div>
       {% else %}
         <p class="op-lead">
           Submit <strong>Generate user-data &amp; meta-data</strong> to show both files here (read-only boxes with <strong>Copy to clipboard</strong>).
@@ -602,6 +613,16 @@
     Browser: set <code>CLOUDINIT_BROWSER_ONLY=1</code> and open this app’s port (see console).
     Desktop: install <code>pywebview</code> and run <code>python app.py</code> (embedded window).
     Seed path override: <code>CLOUDINIT_SEED_DIR</code>.     Outputs: <code>output/user-data</code>, <code>output/meta-data</code>. Backup: <code>backup/preferences.json</code> (removed when you clear preferences).
+    <br><br>
+    When running in Docker, use <strong>Download NoCloud ISO (cidata)</strong> in the Output section after Generate.
+    Or, from a seed folder on the host, create an ISO with:
+    <br>
+    <code><strong>genisoimage -output example.iso -volid cidata -joliet -r output/</strong></code>
+    <br>
+    You can then use the ISO file to boot a virtual machine.
+    <br>
+    <code><strong>virt-install --name=ubuntu-server --memory=1024 --disk path=example.iso,device=cdrom --os-variant=ubuntu22.04 --network=bridge=br0 --graphics=none --console=pty,target_type=serial --boot=network,cdrom</strong></code>
+    <br>
   </footer>
 
   <script>
