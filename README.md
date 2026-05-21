@@ -8,7 +8,7 @@ Web UI to build Ubuntu subiquity/autoinstall `#cloud-config` **user-data** and N
 
 ![Cloud-init autoinstall builder — form](docs/images/readme-form.png)
 
-**Output** — generated `user-data` and `meta-data` with **Download file** and **Copy to clipboard** (and optional load from `output/` on refresh).
+**Output** — generated `user-data` and `meta-data` with **Download file**, **Copy to clipboard**, and **Download NoCloud ISO (cidata)** when `genisoimage` is available (Docker image; optional load from `output/` on refresh).
 
 ![Cloud-init autoinstall builder — output](docs/images/readme-output.png)
 
@@ -68,7 +68,10 @@ Optional:
 
 Then open `http://127.0.0.1:10000`.
 
-Once you have downloaded the files to a seed folder. 
+The image includes **genisoimage**. After **Generate**, use **Download NoCloud ISO (cidata)** in the Output section to build and download a NoCloud seed ISO from the files in the mounted `output/` folder (nothing is written to disk except the two text files).
+
+On the host, you can still build an ISO manually from a seed folder:
+
 ```bash
- genisoimage -output example.iso -volid cidata -joliet -r output/
+genisoimage -output example.iso -volid cidata -joliet -r output/
 ```

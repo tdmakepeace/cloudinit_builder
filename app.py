@@ -2,21 +2,41 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 import threading
 import time
 import urllib.request
+from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
-from flask import Flask, abort, make_response, redirect, render_template, request, send_from_directory, url_for
+from flask import (
+    Flask,
+    abort,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    send_from_directory,
+    url_for,
+)
 
-from cloudinit_builder import builder, late_users, options, paths, persistence, seed_io
+from cloudinit_builder import builder, iso, late_users, options, paths, persistence, seed_io
 
 paths.ensure_backup_env()
 
 app = Flask(__name__)
 
 _OUTPUT_NAMES = frozenset({"user-data", "meta-data"})
+_CIDATA_ISO = "cidata.iso"
+
+
+def outputSeedReady() -> bool:
+    """Return True when both NoCloud seed files exist under ``output_dir()``."""
+    seed_dir = paths.output_dir()
+    return (seed_dir / "user-data").is_file() and (seed_dir / "meta-data").is_file()
 
 
 def fallback_defaults() -> dict:
@@ -126,6 +146,9 @@ def form_from_request() -> dict:
 @app.get("/artifact/<name>")
 def serve_output_artifact(name: str):
     """Serve generated NoCloud files (plain HTTP GET so browsers can export without JavaScript)."""
+    if name == _CIDATA_ISO:
+        return serveCidataIsoDownload()
+
     if name not in _OUTPUT_NAMES:
         abort(404)
     directory = paths.output_dir()
@@ -138,6 +161,39 @@ def serve_output_artifact(name: str):
         mimetype="text/plain; charset=utf-8",
         as_attachment=True,
         download_name=name,
+        max_age=0,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def serveCidataIsoDownload():
+    """Build a temporary NoCloud ISO and stream it as a download."""
+    if not outputSeedReady():
+        abort(404)
+    if not iso.genisoimageAvailable():
+        abort(
+            503,
+            "ISO build requires genisoimage on the server (included in the Docker image).",
+        )
+
+    fd, tmp_name = tempfile.mkstemp(suffix=".iso")
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+
+    try:
+        iso.buildCidataIso(paths.output_dir(), tmp_path)
+        iso_bytes = tmp_path.read_bytes()
+    except Exception:
+        raise
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    response = send_file(
+        BytesIO(iso_bytes),
+        mimetype="application/octet-stream",
+        as_attachment=True,
+        download_name=_CIDATA_ISO,
         max_age=0,
     )
     response.headers["Cache-Control"] = "no-store"
@@ -212,6 +268,7 @@ def index():
         output_from_disk=output_from_disk,
         prefs_saved=prefs_saved_flag == "1",
         prefs_cleared=prefs_cleared_flag == "1",
+        geniso_available=iso.genisoimageAvailable(),
     )
     response = make_response(html)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

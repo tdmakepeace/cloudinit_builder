@@ -5,6 +5,10 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends genisoimage \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install only runtime dependencies needed for the Flask app.
 RUN pip install --no-cache-dir flask passlib pyyaml
 
