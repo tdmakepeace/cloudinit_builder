@@ -41,3 +41,20 @@ def test_late_users_from_form_skips_disabled_rows():
     out = late_users.late_users_from_form(form)
     assert len(out) == 1
     assert out[0]["name"] == "bob"
+
+
+def test_late_users_for_template_exposes_private_keys():
+    rows = late_users.late_users_for_template(
+        [
+            {
+                "name": "alice",
+                "keys": [],
+                "shell": "/bin/bash",
+                "sudo_nopasswd": False,
+                "private_keys": [{"filename": "id_alice", "content": "PRIVATE"}],
+            }
+        ]
+    )
+    assert len(rows) == 1
+    assert rows[0]["name"] == "alice"
+    assert rows[0]["private_keys"][0]["filename"] == "id_alice"

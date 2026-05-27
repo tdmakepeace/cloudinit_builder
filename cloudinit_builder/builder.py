@@ -203,6 +203,7 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
                         "path": f"/home/{user_name}/.ssh/config",
                         "owner": f"{user_name}:{user_name}",
                         "permissions": "0600",
+                        "defer": True,
                         "content": ssh_content,
                     }
                 )
@@ -224,6 +225,7 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
                         "path": f"/home/{user_name}/.ssh/{filename}",
                         "owner": f"{user_name}:{user_name}",
                         "permissions": "0600",
+                        "defer": True,
                         "content": content if content.endswith("\n") else f"{content}\n",
                     }
                 )

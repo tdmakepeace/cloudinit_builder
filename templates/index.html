@@ -546,6 +546,9 @@
               </div>
               <label class="field-label" for="late_u_private_keys_{{ i }}">Private key files for this user (written to this user's ~/.ssh/)</label>
               <input id="late_u_private_keys_{{ i }}" name="late_u_private_keys_{{ i }}" type="file" multiple />
+              {% if i < late_users_rows|length and late_users_rows[i].private_keys %}
+              <p class="hint">Saved private keys: {% for k in late_users_rows[i].private_keys %}<code>{{ k.filename }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+              {% endif %}
               <label class="field-label" for="late_u_ssh_config_{{ i }}">SSH config for this user (~/.ssh/config)</label>
               <textarea id="late_u_ssh_config_{{ i }}" name="late_u_ssh_config_{{ i }}" rows="6"
                 placeholder="host farm&#10;       hostname 192.168.1.222&#10;       user kevwal&#10;       IdentityFile ~/.ssh/287-2023">{% if i < late_users_rows|length %}{{ late_users_rows[i].ssh_config_text }}{% endif %}</textarea>
