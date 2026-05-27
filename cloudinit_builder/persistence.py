@@ -49,8 +49,17 @@ def sanitize_for_save(form: dict[str, Any]) -> dict[str, Any]:
     for key, val in form.items():
         if key == "password_plain":
             continue
+        if key == "ssh_private_keys":
+            continue
         if key == "late_users" and isinstance(val, list):
-            out[key] = val
+            clean_users: list[dict[str, Any]] = []
+            for item in val:
+                if not isinstance(item, dict):
+                    continue
+                user = dict(item)
+                user.pop("private_keys", None)
+                clean_users.append(user)
+            out[key] = clean_users
             continue
         try:
             json.dumps(val)

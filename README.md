@@ -4,7 +4,7 @@ Web UI to build Ubuntu subiquity/autoinstall `#cloud-config` **user-data** and N
 
 ## Screenshots
 
-**Configuration** — identity (hostname, user, password), locale & keyboard, netplan network, SSH, packages, and related sections.
+**Configuration** — identity (hostname, user, password), locale & keyboard, netplan network, SSH, packages, hosts-file entries, and related sections.
 
 ![Cloud-init autoinstall builder — form](docs/images/readme-form.png)
 
@@ -21,6 +21,12 @@ On startup, if **`backup/`** (`~\Cloudinit_builder\backup`) contains saved prefe
 **Generate** writes fresh files to **`output/`** (`~\Cloudinit_builder\output`).
 
 **NoCloud meta-data** in the builder is derived from **hostname** only (`instance-id` and `local-hostname`).
+
+When enabled, the **Update /etc/hosts** section writes a first-boot cloud-init `write_files` entry for `/etc/hosts` using your provided `IP hostname` lines.
+
+In each **Late cloud-init user** row, you can set SSH config blocks (`Host`, `HostName`, `User`, `IdentityFile`). They are persisted in preferences and written to `/home/<user>/.ssh/config` with `0600` permissions.
+
+In each **Late cloud-init user** row, you can upload private key files for that specific user. Uploaded keys are written to `/home/<user>/.ssh/` with `0600` permissions, and key contents are used only for generation (not saved in preferences).
 
 **Preferences file:** `~\Cloudinit_builder\backup\preferences.json`.
 
@@ -50,6 +56,12 @@ Build the image from the project root:
 docker build -t cloudinit_builder .
 ```
 
+When you want to refresh the image after code changes, rebuild with the same tag:
+
+```bash
+docker build --pull -t cloudinit_builder:latest .
+```
+
 Run the container and map the app output to a local `output/` folder under your current directory:
 
 ```bash
@@ -65,6 +77,23 @@ Optional:
 
 - Run detached: `docker run -d -p 10000:10000 -v "$(pwd)/output:/app/output" --name cloudinit_builder cloudinit_builder`
 - Stop detached container: `docker stop cloudinit_builder`
+
+### Update image and restart with new image
+
+If you are using a named container (for example `cloudinit_builder`), use this flow to rebuild and start a container from the new image:
+
+```bash
+docker build --pull -t cloudinit_builder:latest .
+docker stop cloudinit_builder
+docker rm cloudinit_builder
+docker run -d --restart unless-stopped -p 10000:10000 -v "$(pwd)/output:/app/output" --name cloudinit_builder cloudinit_builder:latest
+```
+
+After that, a normal restart command works for future restarts of the same container:
+
+```bash
+docker restart cloudinit_builder
+```
 
 Then open `http://127.0.0.1:10000`.
 

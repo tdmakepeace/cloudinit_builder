@@ -19,6 +19,7 @@ def _base_form(**overrides):
         "enable_storage": False,
         "enable_updates": False,
         "enable_late_user_data": False,
+        "enable_hosts_file_update": False,
         "hostname": "h1",
         "username": "u1",
         "password_mode": "hashed",
@@ -47,6 +48,7 @@ def _base_form(**overrides):
         "late_users": [],
         "packages_late_text": "",
         "late_runcmd_autoremove": False,
+        "hosts_entries_text": "",
     }
     form.update(overrides)
     return form
@@ -124,6 +126,87 @@ def test_late_multiple_users():
     assert "sudo" not in users[1]
 
 
+def test_hosts_file_update_write_files():
+    form = _base_form(
+        enable_late_user_data=True,
+        enable_hosts_file_update=True,
+        hosts_entries_text="10.10.0.10 db01\n10.10.0.11 app01",
+    )
+    ai = builder.build_autoinstall(form)
+    write_files = ai["user-data"]["write_files"]
+    assert len(write_files) == 1
+    wf = write_files[0]
+    assert wf["path"] == "/etc/hosts"
+    assert "127.0.0.1 localhost" in wf["content"]
+    assert "10.10.0.10 db01" in wf["content"]
+    assert "10.10.0.11 app01" in wf["content"]
+
+
+def test_ssh_config_update_write_files():
+    form = _base_form(
+        enable_late_user_data=True,
+        late_users=[
+            {
+                "name": "kevwal",
+                "keys": [],
+                "shell": "/bin/bash",
+                "sudo_nopasswd": False,
+                "ssh_config_text": "\n".join(
+                    [
+                        "host farm",
+                        "       hostname 192.168.1.222",
+                        "       user kevwal",
+                        "       IdentityFile ~/.ssh/287-2023",
+                        "",
+                        "host redshirt1",
+                        "       hostname 192.168.1.9",
+                        "       user kevwal",
+                        "       IdentityFile ~/.ssh/287-2023",
+                    ]
+                ),
+            }
+        ],
+    )
+    ai = builder.build_autoinstall(form)
+    write_files = ai["user-data"]["write_files"]
+    ssh_file = next(wf for wf in write_files if wf["path"] == "/home/kevwal/.ssh/config")
+    assert ssh_file["owner"] == "kevwal:kevwal"
+    assert ssh_file["permissions"] == "0600"
+    assert "Host farm" in ssh_file["content"]
+    assert "HostName 192.168.1.222" in ssh_file["content"]
+    assert "User kevwal" in ssh_file["content"]
+    assert "IdentityFile ~/.ssh/287-2023" in ssh_file["content"]
+    assert "Host redshirt1" in ssh_file["content"]
+    assert "HostName 192.168.1.9" in ssh_file["content"]
+
+
+def test_ssh_key_upload_write_files():
+    key_content = "-----BEGIN OPENSSH PRIVATE KEY-----\nabc123\n-----END OPENSSH PRIVATE KEY-----\n"
+    form = _base_form(
+        enable_late_user_data=True,
+        late_users=[
+            {
+                "name": "kevwal",
+                "keys": [],
+                "shell": "/bin/bash",
+                "sudo_nopasswd": False,
+                "private_keys": [
+                    {"filename": "287-2023", "content": key_content},
+                    {"filename": "id_demo", "content": key_content.rstrip("\n")},
+                ],
+            }
+        ],
+    )
+    ai = builder.build_autoinstall(form)
+    write_files = ai["user-data"]["write_files"]
+    key_files = [wf for wf in write_files if wf["path"].startswith("/home/kevwal/.ssh/")]
+    assert len(key_files) == 2
+    assert any(wf["path"] == "/home/kevwal/.ssh/287-2023" for wf in key_files)
+    assert all(wf["owner"] == "kevwal:kevwal" for wf in key_files)
+    assert all(wf["permissions"] == "0600" for wf in key_files)
+    assert all(wf["content"].endswith("\n") for wf in key_files)
+
+
 def test_defaults_from_seed_roundtrip(tmp_path: Path):
     seed = tmp_path / "seed"
     seed.mkdir()
@@ -160,6 +243,27 @@ def test_defaults_from_seed_roundtrip(tmp_path: Path):
                 "  updates: security",
                 "  user-data:",
                 "    package_update: true",
+                "    write_files:",
+                "      - path: /etc/hosts",
+                "        owner: root:root",
+                "        permissions: '0644'",
+                "        content: |",
+                "          127.0.0.1 localhost",
+                "          ::1 localhost ip6-localhost ip6-loopback",
+                "          10.0.0.50 demo-host",
+                "      - path: /home/demouser/.ssh/config",
+                "        owner: demouser:demouser",
+                "        permissions: '0600'",
+                "        content: |",
+                "          Host github.com",
+                "            HostName 192.168.1.11",
+                "            User ubuntu",
+                "            IdentityFile ~/.ssh/id_github",
+                "",
+                "          Host gitlab.com",
+                "            HostName 192.168.1.12",
+                "            User ubuntu",
+                "            IdentityFile ~/.ssh/id_gitlab",
                 "    users:",
                 "      - name: demouser",
                 "        ssh_authorized_keys: [ssh-ed25519 AAA test]",
@@ -183,6 +287,13 @@ def test_defaults_from_seed_roundtrip(tmp_path: Path):
     assert d["updates_policy"] == "security"
     assert d["ssh_allow_pw"] is False
     assert d["late_runcmd_autoremove"] is True
+    assert d["enable_hosts_file_update"] is True
+    assert "10.0.0.50 demo-host" in d["hosts_entries_text"]
+    assert d["late_users"][0]["ssh_config_text"]
+    assert "host github.com" in d["late_users"][0]["ssh_config_text"]
+    assert "hostname 192.168.1.11" in d["late_users"][0]["ssh_config_text"]
+    assert "user ubuntu" in d["late_users"][0]["ssh_config_text"]
+    assert "IdentityFile ~/.ssh/id_github" in d["late_users"][0]["ssh_config_text"]
     assert "curl" in d["packages_early_text"]
     assert len(d["late_users"]) == 1
     assert d["late_users"][0]["name"] == "demouser"

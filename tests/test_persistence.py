@@ -22,7 +22,25 @@ def test_save_and_load_roundtrip(prefs_file: Path):
         "username": "u",
         "password_plain": "secret",
         "password_hash": "$6$abc",
-        "late_users": [{"name": "a", "keys": ["k1"], "shell": "/bin/bash", "sudo_nopasswd": True}],
+        "hosts_entries_text": "10.0.0.10 host-a",
+        "enable_hosts_file_update": True,
+        "late_users": [
+            {
+                "name": "kevwal",
+                "keys": [],
+                "shell": "/bin/bash",
+                "sudo_nopasswd": False,
+                "ssh_config_text": "\n".join(
+                    [
+                        "host farm",
+                        "       hostname 192.168.1.222",
+                        "       user kevwal",
+                        "       IdentityFile ~/.ssh/287-2023",
+                    ]
+                ),
+                "private_keys": [{"filename": "id_demo", "content": "PRIVATE"}],
+            }
+        ],
         "enable_network": True,
     }
     persistence.save_preferences(form)
@@ -32,6 +50,12 @@ def test_save_and_load_roundtrip(prefs_file: Path):
     assert "password_plain" not in loaded
     assert loaded["password_hash"] == "$6$abc"
     assert len(loaded["late_users"]) == 1
+    assert loaded["hosts_entries_text"] == "10.0.0.10 host-a"
+    assert loaded["enable_hosts_file_update"] is True
+    assert len(loaded["late_users"]) == 1
+    assert loaded["late_users"][0]["name"] == "kevwal"
+    assert "host farm" in loaded["late_users"][0]["ssh_config_text"]
+    assert "private_keys" not in loaded["late_users"][0]
 
 
 def test_merge_saved_over_base():
