@@ -172,6 +172,7 @@ def test_ssh_config_update_write_files():
     ssh_file = next(wf for wf in write_files if wf["path"] == "/home/kevwal/.ssh/config")
     assert ssh_file["owner"] == "kevwal:kevwal"
     assert ssh_file["permissions"] == "0600"
+    assert ssh_file["defer"] is True
     assert "Host farm" in ssh_file["content"]
     assert "HostName 192.168.1.222" in ssh_file["content"]
     assert "User kevwal" in ssh_file["content"]
@@ -204,6 +205,7 @@ def test_ssh_key_upload_write_files():
     assert any(wf["path"] == "/home/kevwal/.ssh/287-2023" for wf in key_files)
     assert all(wf["owner"] == "kevwal:kevwal" for wf in key_files)
     assert all(wf["permissions"] == "0600" for wf in key_files)
+    assert all(wf["defer"] is True for wf in key_files)
     assert all(wf["content"].endswith("\n") for wf in key_files)
 
 

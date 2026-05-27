@@ -49,6 +49,7 @@ def late_users_for_template(users: list[dict[str, Any]]) -> list[dict[str, Any]]
                 "shell": u.get("shell", "/bin/bash"),
                 "sudo_nopasswd": bool(u.get("sudo_nopasswd", False)),
                 "ssh_config_text": u.get("ssh_config_text", ""),
+                "private_keys": u.get("private_keys") or [],
             }
         )
     if not rows:
@@ -60,6 +61,7 @@ def late_users_for_template(users: list[dict[str, Any]]) -> list[dict[str, Any]]
                 "shell": "/bin/bash",
                 "sudo_nopasswd": True,
                 "ssh_config_text": "",
+                "private_keys": [],
             }
         )
     return rows

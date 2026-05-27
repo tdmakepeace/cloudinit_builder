@@ -145,6 +145,7 @@ def form_from_request() -> dict:
         "late_runcmd_autoremove": bool_field("late_runcmd_autoremove"),
         "hosts_entries_text": request.form.get("hosts_entries_text", ""),
     }
+    merge_saved_private_keys_into_form_users(form)
     attach_ssh_private_keys_to_late_users(form)
     return form
 
@@ -186,7 +187,65 @@ def attach_ssh_private_keys_to_late_users(form: dict[str, Any]) -> None:
             idx = int(idx_val)
         except (TypeError, ValueError):
             continue
-        user["private_keys"] = ssh_private_keys_from_request_field(f"late_u_private_keys_{idx}")
+        uploaded_keys = ssh_private_keys_from_request_field(f"late_u_private_keys_{idx}")
+        existing_keys = user.get("private_keys") or []
+        if not isinstance(existing_keys, list):
+            existing_keys = []
+        if uploaded_keys:
+            user["private_keys"] = merge_private_key_lists(existing_keys, uploaded_keys)
+        else:
+            user["private_keys"] = existing_keys
+
+
+def merge_saved_private_keys_into_form_users(form: dict[str, Any]) -> None:
+    """Carry previously saved private keys into currently enabled user rows."""
+    users = form.get("late_users")
+    if not isinstance(users, list) or not users:
+        return
+    saved = persistence.load_preferences() or {}
+    saved_users = saved.get("late_users")
+    if not isinstance(saved_users, list):
+        return
+    saved_by_name: dict[str, list[dict[str, str]]] = {}
+    for item in saved_users:
+        if not isinstance(item, dict):
+            continue
+        nm = str(item.get("name") or "").strip()
+        pks = item.get("private_keys")
+        if not nm or not isinstance(pks, list):
+            continue
+        cleaned: list[dict[str, str]] = []
+        for k in pks:
+            if not isinstance(k, dict):
+                continue
+            filename = Path(str(k.get("filename") or "")).name.strip()
+            content = str(k.get("content") or "")
+            if filename and content:
+                cleaned.append({"filename": filename, "content": content})
+        if cleaned:
+            saved_by_name[nm] = cleaned
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        nm = str(user.get("name") or "").strip()
+        if not nm:
+            continue
+        if nm in saved_by_name and not user.get("private_keys"):
+            user["private_keys"] = list(saved_by_name[nm])
+
+
+def merge_private_key_lists(existing: list[dict[str, str]], uploaded: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Merge keys by filename; uploaded keys replace same-name saved keys."""
+    merged: dict[str, dict[str, str]] = {}
+    for item in existing + uploaded:
+        if not isinstance(item, dict):
+            continue
+        filename = Path(str(item.get("filename") or "")).name.strip()
+        content = str(item.get("content") or "")
+        if not filename or not content:
+            continue
+        merged[filename] = {"filename": filename, "content": content}
+    return list(merged.values())
 
 
 @app.get("/artifact/<name>")

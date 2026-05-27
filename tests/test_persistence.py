@@ -55,7 +55,9 @@ def test_save_and_load_roundtrip(prefs_file: Path):
     assert len(loaded["late_users"]) == 1
     assert loaded["late_users"][0]["name"] == "kevwal"
     assert "host farm" in loaded["late_users"][0]["ssh_config_text"]
-    assert "private_keys" not in loaded["late_users"][0]
+    assert len(loaded["late_users"][0]["private_keys"]) == 1
+    assert loaded["late_users"][0]["private_keys"][0]["filename"] == "id_demo"
+    assert loaded["late_users"][0]["private_keys"][0]["content"] == "PRIVATE"
 
 
 def test_merge_saved_over_base():
