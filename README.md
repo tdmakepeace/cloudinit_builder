@@ -62,11 +62,15 @@ When you want to refresh the image after code changes, rebuild with the same tag
 docker build --pull -t cloudinit_builder:latest .
 ```
 
-Run the container and map the app output to a local `output/` folder under your current directory:
+Run the container with persistent host folders for output, initial seed files, and backup preferences:
 
 ```bash
-mkdir -p output
-docker run --rm -p 10000:10000 -v "$(pwd)/output:/app/output" cloudinit_builder
+mkdir -p output initial backup
+docker run --rm -p 10000:10000 \
+  -v "$(pwd)/output:/app/output" \
+  -v "$(pwd)/initial:/app/initial" \
+  -v "$(pwd)/backup:/app/backup" \
+  cloudinit_builder
 ```
 
 Stop the app:
@@ -75,7 +79,8 @@ Stop the app:
 
 Optional:
 
-- Run detached: `docker run -d -p 10000:10000 -v "$(pwd)/output:/app/output" --name cloudinit_builder cloudinit_builder`
+- Run detached:
+  `docker run -d -p 10000:10000 -v "$(pwd)/output:/app/output" -v "$(pwd)/initial:/app/initial" -v "$(pwd)/backup:/app/backup" --name cloudinit_builder cloudinit_builder`
 - Stop detached container: `docker stop cloudinit_builder`
 
 ### Update image and restart with new image
@@ -86,7 +91,11 @@ If you are using a named container (for example `cloudinit_builder`), use this f
 docker build --pull -t cloudinit_builder:latest .
 docker stop cloudinit_builder
 docker rm cloudinit_builder
-docker run -d --restart unless-stopped -p 10000:10000 -v "$(pwd)/output:/app/output" --name cloudinit_builder cloudinit_builder:latest
+docker run -d --restart unless-stopped -p 10000:10000 \
+  -v "$(pwd)/output:/app/output" \
+  -v "$(pwd)/initial:/app/initial" \
+  -v "$(pwd)/backup:/app/backup" \
+  --name cloudinit_builder cloudinit_builder:latest
 ```
 
 After that, a normal restart command works for future restarts of the same container:
