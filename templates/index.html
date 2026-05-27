@@ -311,7 +311,7 @@
   </header>
 
   <div class="layout">
-    <form class="panel" method="post" id="main-form">
+    <form class="panel" method="post" id="main-form" enctype="multipart/form-data">
       <h2>Sections</h2>
       {% if prefs_saved %}<div class="success">Preferences saved. They will load automatically next time you open this app.</div>{% endif %}
       {% if prefs_cleared %}<div class="success">Saved preferences were cleared. Defaults will come from the seed directory again.</div>{% endif %}
@@ -544,12 +544,32 @@
                   <label class="field-label"><input type="checkbox" name="late_u_sudo_{{ i }}" {% if i < late_users_rows|length and late_users_rows[i].sudo_nopasswd %}checked{% endif %} /> sudo NOPASSWD</label>
                 </div>
               </div>
+              <label class="field-label" for="late_u_private_keys_{{ i }}">Private key files for this user (written to this user's ~/.ssh/)</label>
+              <input id="late_u_private_keys_{{ i }}" name="late_u_private_keys_{{ i }}" type="file" multiple />
+              <label class="field-label" for="late_u_ssh_config_{{ i }}">SSH config for this user (~/.ssh/config)</label>
+              <textarea id="late_u_ssh_config_{{ i }}" name="late_u_ssh_config_{{ i }}" rows="6"
+                placeholder="host farm&#10;       hostname 192.168.1.222&#10;       user kevwal&#10;       IdentityFile ~/.ssh/287-2023">{% if i < late_users_rows|length %}{{ late_users_rows[i].ssh_config_text }}{% endif %}</textarea>
+              <p class="hint">This user's SSH config is saved in preferences and written to <code>/home/&lt;user&gt;/.ssh/config</code> with <code>0600</code> permissions.</p>
             </div>
           </div>
           {% endfor %}
           <label class="field-label" for="packages_late_text">Extra packages (first boot)</label>
           <textarea id="packages_late_text" name="packages_late_text">{{ defaults.packages_late_text }}</textarea>
           <label class="field-label"><input type="checkbox" name="late_runcmd_autoremove" {% if defaults.late_runcmd_autoremove %}checked{% endif %} /> runcmd: apt-get autoremove -y</label>
+        </div>
+      </section>
+
+      <section class="block" data-section="hosts">
+        <div class="sec-head">
+          <input type="checkbox" name="enable_hosts_file_update" id="enable_hosts_file_update"
+            {% if defaults.enable_hosts_file_update %}checked{% endif %} />
+          <label for="enable_hosts_file_update">Update /etc/hosts (first boot)</label>
+        </div>
+        <div class="subfields" data-sub="hosts">
+          <label class="field-label" for="hosts_entries_text">Hosts entries (one per line as: IP hostname)</label>
+          <textarea id="hosts_entries_text" name="hosts_entries_text" rows="6"
+            placeholder="10.0.0.10 db01&#10;10.0.0.11 app01">{{ defaults.hosts_entries_text }}</textarea>
+          <p class="hint">Lines beginning with <code>#</code> are ignored. Example: <code>192.168.1.10 myserver</code>.</p>
         </div>
       </section>
 
@@ -635,7 +655,8 @@
         ["enable_packages_early", "packages_early"],
         ["enable_storage", "storage"],
         ["enable_updates", "updates"],
-        ["enable_late_user_data", "late"]
+        ["enable_late_user_data", "late"],
+        ["enable_hosts_file_update", "hosts"]
       ];
       function syncGenerateGate() {
         var btn = document.getElementById("btn-generate");

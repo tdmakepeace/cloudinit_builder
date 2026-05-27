@@ -22,10 +22,12 @@ def late_users_from_form(form: Mapping[str, Any], max_rows: int = 32) -> list[di
             continue
         out.append(
             {
+                "row_index": i,
                 "name": name,
                 "keys": keys,
                 "shell": shell,
                 "sudo_nopasswd": sudo,
+                "ssh_config_text": str(form.get(f"late_u_ssh_config_{i}") or "").strip(),
             }
         )
     return out
@@ -46,6 +48,7 @@ def late_users_for_template(users: list[dict[str, Any]]) -> list[dict[str, Any]]
                 "keys_text": keys_text,
                 "shell": u.get("shell", "/bin/bash"),
                 "sudo_nopasswd": bool(u.get("sudo_nopasswd", False)),
+                "ssh_config_text": u.get("ssh_config_text", ""),
             }
         )
     if not rows:
@@ -56,6 +59,7 @@ def late_users_for_template(users: list[dict[str, Any]]) -> list[dict[str, Any]]
                 "keys_text": "",
                 "shell": "/bin/bash",
                 "sudo_nopasswd": True,
+                "ssh_config_text": "",
             }
         )
     return rows

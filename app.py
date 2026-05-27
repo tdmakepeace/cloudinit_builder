@@ -9,7 +9,7 @@ import time
 import urllib.request
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from flask import (
     Flask,
@@ -49,6 +49,7 @@ def fallback_defaults() -> dict:
         "enable_storage": True,
         "enable_updates": True,
         "enable_late_user_data": True,
+        "enable_hosts_file_update": False,
         "hostname": "ubuntu-server",
         "username": "ubuntu",
         "password_mode": "hashed",
@@ -77,6 +78,7 @@ def fallback_defaults() -> dict:
         "late_users": [],
         "packages_late_text": "",
         "late_runcmd_autoremove": False,
+        "hosts_entries_text": "",
     }
 
 
@@ -103,7 +105,7 @@ def form_from_request() -> dict:
     def bool_field(name: str) -> bool:
         return request.form.get(name) == "on"
 
-    return {
+    form = {
         "enable_identity": bool_field("enable_identity"),
         "enable_locale": bool_field("enable_locale"),
         "enable_network": bool_field("enable_network"),
@@ -112,6 +114,7 @@ def form_from_request() -> dict:
         "enable_storage": bool_field("enable_storage"),
         "enable_updates": bool_field("enable_updates"),
         "enable_late_user_data": bool_field("enable_late_user_data"),
+        "enable_hosts_file_update": bool_field("enable_hosts_file_update"),
         "hostname": request.form.get("hostname", ""),
         "username": request.form.get("username", ""),
         "password_mode": request.form.get("password_mode", "hashed"),
@@ -140,7 +143,50 @@ def form_from_request() -> dict:
         "late_users": late_users.late_users_from_form(request.form),
         "packages_late_text": request.form.get("packages_late_text", ""),
         "late_runcmd_autoremove": bool_field("late_runcmd_autoremove"),
+        "hosts_entries_text": request.form.get("hosts_entries_text", ""),
     }
+    attach_ssh_private_keys_to_late_users(form)
+    return form
+
+
+def ssh_private_keys_from_request_field(field_name: str) -> list[dict[str, str]]:
+    """Read uploaded private key files from a specific multipart field."""
+    keys: list[dict[str, str]] = []
+    for file_obj in request.files.getlist(field_name):
+        if file_obj is None:
+            continue
+        raw_name = file_obj.filename or ""
+        name = Path(raw_name).name.strip()
+        if not name:
+            continue
+        data = file_obj.read()
+        if not data:
+            continue
+        try:
+            content = data.decode("utf-8")
+        except UnicodeDecodeError:
+            # SSH private keys should be PEM/text; skip binary payloads.
+            continue
+        keys.append({"filename": name, "content": content})
+    return keys
+
+
+def attach_ssh_private_keys_to_late_users(form: dict[str, Any]) -> None:
+    """Attach uploaded private keys to each late user based on row index."""
+    users = form.get("late_users")
+    if not isinstance(users, list):
+        return
+    for user in users:
+        if not isinstance(user, dict):
+            continue
+        idx_val = user.get("row_index")
+        if idx_val is None:
+            continue
+        try:
+            idx = int(idx_val)
+        except (TypeError, ValueError):
+            continue
+        user["private_keys"] = ssh_private_keys_from_request_field(f"late_u_private_keys_{idx}")
 
 
 @app.get("/artifact/<name>")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 import yaml
@@ -121,6 +122,7 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
 
     if form.get("enable_late_user_data"):
         late: dict[str, Any] = {}
+        write_files: list[dict[str, Any]] = []
         if form.get("late_package_update"):
             late["package_update"] = True
         if form.get("late_package_upgrade"):
@@ -156,6 +158,78 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
         late_pkgs = seed_io.parse_package_lines(form.get("packages_late_text", ""))
         if late_pkgs:
             late["packages"] = late_pkgs
+
+        if form.get("enable_hosts_file_update"):
+            hosts_entries = seed_io.parse_hosts_entries(str(form.get("hosts_entries_text") or ""))
+            if hosts_entries:
+                host_lines = [
+                    "127.0.0.1 localhost",
+                    "::1 localhost ip6-localhost ip6-loopback",
+                ]
+                host_lines.extend(f"{ip} {host}" for ip, host in hosts_entries)
+                hosts_content = "\n".join(host_lines) + "\n"
+                write_files.append(
+                    {
+                        "path": "/etc/hosts",
+                        "owner": "root:root",
+                        "permissions": "0644",
+                        "content": hosts_content,
+                    }
+                )
+
+        for user in form.get("late_users") or []:
+            if not isinstance(user, dict):
+                continue
+            user_name = str(user.get("name") or "").strip()
+            if not user_name:
+                continue
+
+            ssh_entries = seed_io.parse_ssh_config_entries(str(user.get("ssh_config_text") or ""))
+            if ssh_entries:
+                ssh_lines = []
+                for entry in ssh_entries:
+                    ssh_lines.extend(
+                        [
+                            f"Host {entry['host']}",
+                            f"  HostName {entry['hostname']}",
+                            f"  User {entry['user']}",
+                            f"  IdentityFile {entry['identity_file']}",
+                            "",
+                        ]
+                    )
+                ssh_content = "\n".join(ssh_lines).strip() + "\n"
+                write_files.append(
+                    {
+                        "path": f"/home/{user_name}/.ssh/config",
+                        "owner": f"{user_name}:{user_name}",
+                        "permissions": "0600",
+                        "content": ssh_content,
+                    }
+                )
+
+            private_keys = user.get("private_keys") or []
+            if not isinstance(private_keys, list):
+                continue
+            for key_entry in private_keys:
+                if not isinstance(key_entry, dict):
+                    continue
+                filename = Path(str(key_entry.get("filename") or "")).name.strip()
+                content = str(key_entry.get("content") or "")
+                if not filename or not content.strip():
+                    continue
+                if "/" in filename or "\\" in filename:
+                    continue
+                write_files.append(
+                    {
+                        "path": f"/home/{user_name}/.ssh/{filename}",
+                        "owner": f"{user_name}:{user_name}",
+                        "permissions": "0600",
+                        "content": content if content.endswith("\n") else f"{content}\n",
+                    }
+                )
+
+        if write_files:
+            late["write_files"] = write_files
 
         if form.get("late_runcmd_autoremove"):
             late["runcmd"] = ["apt-get autoremove -y"]
