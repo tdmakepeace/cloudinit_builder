@@ -169,16 +169,18 @@ def test_ssh_config_update_write_files():
     )
     ai = builder.build_autoinstall(form)
     write_files = ai["user-data"]["write_files"]
-    ssh_file = next(wf for wf in write_files if wf["path"] == "/home/kevwal/.ssh/config")
-    assert ssh_file["owner"] == "kevwal:kevwal"
+    ssh_file = next(wf for wf in write_files if wf["path"].startswith("/var/tmp/cloudinit_builder_ssh_kevwal_config"))
+    assert ssh_file["owner"] == "root:root"
     assert ssh_file["permissions"] == "0600"
-    assert ssh_file["defer"] is True
     assert "Host farm" in ssh_file["content"]
     assert "HostName 192.168.1.222" in ssh_file["content"]
     assert "User kevwal" in ssh_file["content"]
     assert "IdentityFile ~/.ssh/287-2023" in ssh_file["content"]
     assert "Host redshirt1" in ssh_file["content"]
     assert "HostName 192.168.1.9" in ssh_file["content"]
+    runcmd = ai["user-data"]["runcmd"]
+    assert any("/home/kevwal/.ssh/config" in cmd for cmd in runcmd)
+    assert any("install -d -m 700 -o kevwal -g kevwal /home/kevwal/.ssh" in cmd for cmd in runcmd)
 
 
 def test_ssh_key_upload_write_files():
@@ -200,13 +202,15 @@ def test_ssh_key_upload_write_files():
     )
     ai = builder.build_autoinstall(form)
     write_files = ai["user-data"]["write_files"]
-    key_files = [wf for wf in write_files if wf["path"].startswith("/home/kevwal/.ssh/")]
+    key_files = [wf for wf in write_files if wf["path"].startswith("/var/tmp/cloudinit_builder_ssh_kevwal_")]
     assert len(key_files) == 2
-    assert any(wf["path"] == "/home/kevwal/.ssh/287-2023" for wf in key_files)
-    assert all(wf["owner"] == "kevwal:kevwal" for wf in key_files)
+    assert any("287-2023" in wf["path"] for wf in key_files)
+    assert all(wf["owner"] == "root:root" for wf in key_files)
     assert all(wf["permissions"] == "0600" for wf in key_files)
-    assert all(wf["defer"] is True for wf in key_files)
     assert all(wf["content"].endswith("\n") for wf in key_files)
+    runcmd = ai["user-data"]["runcmd"]
+    assert any("/home/kevwal/.ssh/287-2023" in cmd for cmd in runcmd)
+    assert any("/home/kevwal/.ssh/id_demo" in cmd for cmd in runcmd)
 
 
 def test_defaults_from_seed_roundtrip(tmp_path: Path):

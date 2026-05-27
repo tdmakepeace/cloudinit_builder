@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import shlex
 from pathlib import Path
 from typing import Any, Optional
 
@@ -123,6 +125,7 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
     if form.get("enable_late_user_data"):
         late: dict[str, Any] = {}
         write_files: list[dict[str, Any]] = []
+        user_ssh_install_commands: list[str] = []
         if form.get("late_package_update"):
             late["package_update"] = True
         if form.get("late_package_upgrade"):
@@ -183,6 +186,8 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
             user_name = str(user.get("name") or "").strip()
             if not user_name:
                 continue
+            user_quoted = shlex.quote(user_name)
+            user_home_ssh = f"/home/{user_quoted}/.ssh"
 
             ssh_entries = seed_io.parse_ssh_config_entries(str(user.get("ssh_config_text") or ""))
             if ssh_entries:
@@ -198,14 +203,22 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
                         ]
                     )
                 ssh_content = "\n".join(ssh_lines).strip() + "\n"
+                tmp_config_name = _tmp_ssh_filename(user_name, "config")
+                tmp_config_path = f"/var/tmp/{tmp_config_name}"
                 write_files.append(
                     {
-                        "path": f"/home/{user_name}/.ssh/config",
-                        "owner": f"{user_name}:{user_name}",
+                        "path": tmp_config_path,
+                        "owner": "root:root",
                         "permissions": "0600",
-                        "defer": True,
                         "content": ssh_content,
                     }
+                )
+                user_ssh_install_commands.extend(
+                    [
+                        f"install -d -m 700 -o {user_quoted} -g {user_quoted} {user_home_ssh}",
+                        f"install -m 600 -o {user_quoted} -g {user_quoted} "
+                        f"{shlex.quote(tmp_config_path)} {user_home_ssh}/config",
+                    ]
                 )
 
             private_keys = user.get("private_keys") or []
@@ -220,26 +233,44 @@ def build_autoinstall(form: dict[str, Any]) -> dict[str, Any]:
                     continue
                 if "/" in filename or "\\" in filename:
                     continue
+                tmp_key_name = _tmp_ssh_filename(user_name, filename)
+                tmp_key_path = f"/var/tmp/{tmp_key_name}"
                 write_files.append(
                     {
-                        "path": f"/home/{user_name}/.ssh/{filename}",
-                        "owner": f"{user_name}:{user_name}",
+                        "path": tmp_key_path,
+                        "owner": "root:root",
                         "permissions": "0600",
-                        "defer": True,
                         "content": content if content.endswith("\n") else f"{content}\n",
                     }
+                )
+                user_ssh_install_commands.extend(
+                    [
+                        f"install -d -m 700 -o {user_quoted} -g {user_quoted} {user_home_ssh}",
+                        f"install -m 600 -o {user_quoted} -g {user_quoted} "
+                        f"{shlex.quote(tmp_key_path)} {user_home_ssh}/{shlex.quote(filename)}",
+                    ]
                 )
 
         if write_files:
             late["write_files"] = write_files
 
+        runcmd: list[str] = []
         if form.get("late_runcmd_autoremove"):
-            late["runcmd"] = ["apt-get autoremove -y"]
+            runcmd.append("apt-get autoremove -y")
+        if user_ssh_install_commands:
+            runcmd.extend(user_ssh_install_commands)
+        if runcmd:
+            late["runcmd"] = runcmd
 
         if late:
             ai["user-data"] = late
 
     return ai
+
+
+def _tmp_ssh_filename(user_name: str, source_name: str) -> str:
+    joined = f"cloudinit_builder_ssh_{user_name}_{source_name}"
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", joined)
 
 
 def build_user_data_yaml(form: dict[str, Any]) -> str:
