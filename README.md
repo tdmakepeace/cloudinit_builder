@@ -50,61 +50,41 @@ Port and options are configured in `app.py` under `if __name__ == "__main__"`.
 
 ## Docker
 
-Build the image from the project root:
+Docker build and start
+
+From the project root (`/apps/NGINX` on the host):
+
+Build/rebuild image
 
 ```bash
-docker build -t cloudinit_builder .
+docker compose build --no-cache
 ```
 
-When you want to refresh the image after code changes, rebuild with the same tag:
+Start container
 
 ```bash
-docker build --pull -t cloudinit_builder:latest .
+docker compose up -d
 ```
 
-Run the container with persistent host folders for output, initial seed files, and backup preferences:
+Restart after config/page changes
 
 ```bash
-mkdir -p output initial backup
-docker run --rm -p 10000:10000 \
-  -v "$(pwd)/output:/app/output" \
-  -v "$(pwd)/initial:/app/initial" \
-  -v "$(pwd)/backup:/app/backup" \
-  cloudinit_builder
+docker compose restart
 ```
 
-Stop the app:
-
-- Press `Ctrl+C` in the terminal running the container.
-
-Optional:
-
-- Run detached:
-  `docker run -d -p 10000:10000 -v "$(pwd)/output:/app/output" -v "$(pwd)/initial:/app/initial" -v "$(pwd)/backup:/app/backup" --name cloudinit_builder cloudinit_builder`
-- Stop detached container: `docker stop cloudinit_builder`
-
-### Update image and restart with new image
-
-If you are using a named container (for example `cloudinit_builder`), use this flow to rebuild and start a container from the new image:
+Stop container
 
 ```bash
-docker build --pull -t cloudinit_builder:latest .
-docker stop cloudinit_builder
-docker rm cloudinit_builder
-docker run -d --restart unless-stopped -p 10000:10000 \
-  -v "$(pwd)/output:/app/output" \
-  -v "$(pwd)/initial:/app/initial" \
-  -v "$(pwd)/backup:/app/backup" \
-  --name cloudinit_builder cloudinit_builder:latest
-```
-
-After that, a normal restart command works for future restarts of the same container:
-
-```bash
-docker restart cloudinit_builder
+docker compose down
 ```
 
 Then open `http://127.0.0.1:10000`.
+
+The compose file mounts persistent host folders for:
+
+- `./output` → `/app/output`
+- `./initial` → `/app/initial`
+- `./backup` → `/app/backup`
 
 The image includes **genisoimage**. After **Generate**, use **Download NoCloud ISO (cidata)** in the Output section to build and download a NoCloud seed ISO from the files in the mounted `output/` folder (nothing is written to disk except the two text files).
 

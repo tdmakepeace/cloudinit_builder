@@ -1,0 +1,13 @@
+services:
+  cloudinit_builder:
+    container_name: cloudinit_builder
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./output:/app/output
+      - ./initial:/app/initial
+      - ./backup:/app/backup
+    restart: unless-stopped
